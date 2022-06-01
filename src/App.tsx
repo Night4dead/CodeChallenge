@@ -1,109 +1,165 @@
 import React, { useState } from "react";
 type Args = { [argname: string]: boolean };
-type Operation = { args: (Operation | Args | boolean)[], op: string }; /* ...todo:
-a system for defining logical operations 
-(not, and, or... more if you want) that can be passed:
- - selected args by name: (X and Y)
- - constant values not dependent on args: (true and X)
- - other operations: ((X and Y) or Z) 
- */
+type Operation = { elements: any, op: string };
 
-function evaluateOperation(operation: Operation, args: Args): any {
-  /* ...todo: implement an evaluator for your operations, 
-  given some args */
-  if (!operation.args)
+let args = [{ "My arg": false } as Args];
+
+function findArgName(args: Args): string {
+  return Object.keys(args)[0];
+}
+
+function findArgValue(args: Args): boolean {
+  return Object.values(args)[0];
+}
+
+const options = {
+  CONSTANT: "constant",
+  ARGUMENT: "argument",
+  AND: "and",
+  OR: "or",
+  NOT: "not"
+}
+
+function evaluateOperation(operation: Operation): any {
+  if (!operation.elements || !operation.op)
     return undefined;
-  if (operation.op === "or")
-    return operation.args.some((value) => { return evaluateOperation(value as Operation, {}) });
-  if (operation.op === "and")
-    return operation.args.every((value) => { return evaluateOperation(value as Operation, {}) });
-  if (operation.op === "argument")
-    return Object.values(operation.args[0])[0];
-  if (operation.op === "constant")
-    return operation.args[0] as boolean;
-  return undefined;
+  if (operation.op === options.CONSTANT)
+    return operation.elements[0];
+  if (operation.op === options.ARGUMENT)
+    return findArgValue(args[operation.elements[0]]);
+  if (operation.op === options.NOT)
+    return !evaluateOperation(operation.elements[0]);
+  if (operation.op === options.AND)
+    return operation.elements.every((value: Operation) => evaluateOperation(value));
+  if (operation.op === options.OR)
+    return operation.elements.some((value: Operation) => evaluateOperation(value));
 }
 
 function OperationBuilder(props: {
-  args: Args[],
   value: Operation;
   onChange: (value: Operation) => void;
 }): JSX.Element {
-
-  function changeOp(event: any) {
-    let op = { ...props.value, op: event.target.value } as Operation;
-    if (op.op === "constant")
-      op.args = [false];
-    if (op.op === "argument")
-      op.args = [props.args[0]];
-    props.onChange(op);
-  }
-
-  function changeArgs(args: (Operation | Args | boolean)[]) {
-    let op = { ...props.value, args: args } as Operation;
-    props.onChange(op);
-  }
 
   function reset() {
     props.onChange({} as Operation);
   }
 
-  const options = [
-    "constant",
-    "argument",
-    "and",
-    "or"
-  ]
+  function changeOp(event: any) {
+    let elements;
+    if (event.target.value === options.ARGUMENT) {
+      elements = [0];
+      props.onChange({ ...props.value, elements: elements, op: event.target.value });
+    } else if ((event.target.value === options.AND || event.target.value === options.OR) && !props.value.elements) {
+      let op1 = {} as Operation;
+      let op2 = {} as Operation;
+      props.onChange({ ...props.value, elements: [op1, op2], op: event.target.value });
+    } else if ((event.target.value === options.NOT) && !props.value.elements) {
+      let op1 = {} as Operation;
+      props.onChange({ ...props.value, elements: [op1], op: event.target.value });
+    } else
+      props.onChange({ ...props.value, op: event.target.value });
+  }
+
+  function changeElement(event: any) {
+    if (props.value.op === options.CONSTANT)
+      props.onChange({ ...props.value, elements: [event.target.value === "true" ? true : false] });
+    else
+      props.onChange({ ...props.value, elements: [event.target.value] })
+  }
 
   let select;
 
-  if (props.value.op === "constant") {
-    select = <select onChange={event => changeArgs([event.target.value === "true" ? true : false])}>
-      <option value={"false"}>false</option>
-      <option value={"true"}>true</option>
-    </select>;
-  }
-
-  if (props.value.op === "argument") {
-    select = <select>
-      {props.args.map((value, index) => {
-        const name: string = Object.keys(value)[0];
-        return (
-          <option key={index} value={name}>{name}</option>
-        )
-      })}
-    </select>;
-  }
-
-  if (props.value.op === "and" || props.value.op === "or") {
-
-    const [operation1, setOperation1] = useState({} as Operation);
-    const [operation2, setOperation2] = useState({} as Operation);
-    //props.onChange({...props.value, args: [operation1,operation2] });
-    return <div>
-      <div>
-        <select onChange={(event) => changeOp(event)} defaultValue={props.value.op}>
-          <option selected disabled>select...</option>
-          {options.map((value, index) => (
-            <option key={index} value={value}>{value}</option>
-          ))}
-        </select>
-        <button type="button" onClick={reset}>X</button>
-      </div>
-      <div style={{ paddingLeft: 20 }}>
-        <OperationBuilder args={props.args} value={ operation1 } onChange={value => setOperation1(value)}/>
-        <OperationBuilder args={props.args} value={ operation2 } onChange={value => setOperation2(value)}/>
-      </div>
-    </div>
-  }
-
-  if (!props.value.op)
-    select = <select onChange={(event) => changeOp(event)}>
+  if (!props.value.op) {
+    select = <select onChange={changeOp}>
       <option selected disabled>select...</option>
-      {options.map((value, index) => (
+      {Object.values(options).map((value, index) => (
         <option key={index} value={value}>{value}</option>
       ))}
     </select>;
+  }
+
+  if (props.value.op === options.CONSTANT) {
+    select = <select onChange={changeElement}>
+      <option value={"false"}>false</option>
+      <option value={"true"}>true</option>
+    </select>
+  }
+
+  if (props.value.op === options.ARGUMENT) {
+    select = <select onChange={changeElement}>
+      {args.map((value, index) => (
+        <option key={index} value={index}>{findArgName(value)}</option>
+      ))}
+    </select>;
+  }
+
+  if(props.value.op === options.NOT){
+    const [subElements, setSubElements] = useState([...props.value.elements]);
+
+    return (
+      <div>
+        <div>
+          <select defaultValue={props.value.op} onChange={changeOp}>
+            <option value={options.NOT}>{options.NOT}</option>
+          </select>
+          <button type="button" onClick={reset}>X</button>
+        </div>
+        <div className="arguments">
+          {subElements.map((value, index) => {
+
+            const updateElement = (value: Operation) => {
+              console.log(value);
+              props.value.elements[index] = value;
+              props.onChange({...props.value});
+              setSubElements([...props.value.elements]);
+            }
+
+            return (
+              <OperationBuilder key={index} value={value} onChange={updateElement} />
+            )
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  if (props.value.op === options.AND || props.value.op === options.OR) {
+    const [subElements, setSubElements] = useState([...props.value.elements]);
+
+    const addElement = () => {
+      let op = {} as Operation;
+      props.onChange({ ...props.value, elements: [...props.value.elements, op] });
+      setSubElements([...subElements, op]);
+    }
+
+    return (
+      <div>
+        <div>
+          <select defaultValue={props.value.op} onChange={changeOp}>
+            <option value={options.AND}>{options.AND}</option>
+            <option value={options.OR}>{options.OR}</option>
+          </select>
+          <button type="button" onClick={reset}>X</button>
+        </div>
+        <div className="arguments">
+          {subElements.map((value, index) => {
+
+            const updateElement = (value: Operation) => {
+              console.log(value);
+              props.value.elements[index] = value;
+              props.onChange({...props.value});
+              setSubElements([...props.value.elements]);
+            }
+
+            return (
+              <OperationBuilder key={index} value={value} onChange={updateElement} />
+            )
+          })}
+          <button type="button" onClick={addElement}>add op</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -118,8 +174,8 @@ function ArgItem(props: {
   key: number;
   onChange: (value: Args) => void;
 }): JSX.Element {
-  const value: boolean = Object.values(props.value)[0];
-  const name: string = Object.keys(props.value)[0];
+  const value: boolean = findArgValue(props.value);
+  const name: string = findArgName(props.value);
 
   function updateName(event: any) {
     let newName = event.target.value;
@@ -127,7 +183,7 @@ function ArgItem(props: {
   }
 
   function updateValue(event: any) {
-    let newValue = event.target.value as boolean;
+    let newValue: boolean = event.target.value === "true" ? true : false;
     props.onChange({ [name]: newValue })
   }
 
@@ -143,20 +199,17 @@ function ArgItem(props: {
 }
 
 export default function App() {
-
-  const [args, setArgs] = useState([{ "My arg": false } as Args]);
-
+  const [, setArgs] = useState();
   const [operation, setOperation] = useState({} as Operation);
 
   function updateArgs(index: number, value: Args) {
-    let argsNew = [...args];
-    argsNew[index] = value;
-    setArgs(argsNew);
+    args[index] = value;
+    setArgs({} as any);
   }
 
   function addArg() {
-    let argsNew = [...args, { "newargs": false }];
-    setArgs(argsNew);
+    args.push({ "newargs": false });
+    setArgs({} as any);
   }
 
   return (
@@ -164,12 +217,9 @@ export default function App() {
       {args.map((element, index) => (
         <ArgItem value={element} onChange={(value) => updateArgs(index, value)} key={index} />
       ))}
-      <button type="button" onClick={addArg}>add args</button>
-      <OperationBuilder args={args} value={operation} onChange={value => setOperation(value)} />
-      <p>Result : {String(evaluateOperation(operation, {}))}</p>
-      {args.map((value, index) =>
-        <p key={index}>{String(Object.keys(value)[0])} : {String(Object.values(value)[0])}</p>
-      )}
+      <button className="argsplus" type="button" onClick={addArg}>add args</button>
+      <OperationBuilder value={operation} onChange={value => setOperation(value)} />
+      <p>Result : {String(evaluateOperation(operation))}</p>
     </div>
   );
 }
