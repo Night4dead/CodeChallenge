@@ -108,7 +108,6 @@ function OperationBuilder(props: {
           {subElements.map((value, index) => {
 
             const updateElement = (value: Operation) => {
-              console.log(value);
               props.value.elements[index] = value;
               props.onChange({...props.value});
               setSubElements([...props.value.elements]);
@@ -145,7 +144,6 @@ function OperationBuilder(props: {
           {subElements.map((value, index) => {
 
             const updateElement = (value: Operation) => {
-              console.log(value);
               props.value.elements[index] = value;
               props.onChange({...props.value});
               setSubElements([...props.value.elements]);
