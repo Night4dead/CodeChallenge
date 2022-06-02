@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 type Args = { [argname: string]: boolean };
-type Operation = { elements: any, op: string };
+type Operation = { elements: (Operation | number | boolean)[], op: string };
 
 let args = [{ "My arg": false } as Args];
 
@@ -26,13 +26,13 @@ function evaluateOperation(operation: Operation): any {
   if (operation.op === options.CONSTANT)
     return operation.elements[0];
   if (operation.op === options.ARGUMENT)
-    return findArgValue(args[operation.elements[0]]);
+    return findArgValue(args[operation.elements[0] as number]);
   if (operation.op === options.NOT)
-    return !evaluateOperation(operation.elements[0]);
+    return !evaluateOperation(operation.elements[0] as Operation);
   if (operation.op === options.AND)
-    return operation.elements.every((value: Operation) => evaluateOperation(value));
+    return operation.elements.every((value: Operation | number | boolean) => evaluateOperation(value as Operation));
   if (operation.op === options.OR)
-    return operation.elements.some((value: Operation) => evaluateOperation(value));
+    return operation.elements.some((value: Operation | number | boolean) => evaluateOperation(value as Operation));
 }
 
 function OperationBuilder(props: {
@@ -56,6 +56,8 @@ function OperationBuilder(props: {
     } else if ((event.target.value === options.NOT) && !props.value.elements) {
       let op1 = {} as Operation;
       props.onChange({ ...props.value, elements: [op1], op: event.target.value });
+    } else if ((event.target.value === options.CONSTANT) && !props.value.elements) {
+      props.onChange({ ...props.value, elements: [false], op: event.target.value });
     } else
       props.onChange({ ...props.value, op: event.target.value });
   }
@@ -114,7 +116,7 @@ function OperationBuilder(props: {
             }
 
             return (
-              <OperationBuilder key={index} value={value} onChange={updateElement} />
+              <OperationBuilder key={index} value={value as Operation} onChange={updateElement} />
             )
           })}
         </div>
@@ -150,7 +152,7 @@ function OperationBuilder(props: {
             }
 
             return (
-              <OperationBuilder key={index} value={value} onChange={updateElement} />
+              <OperationBuilder key={index} value={value as Operation} onChange={updateElement} />
             )
           })}
           <button type="button" onClick={addElement}>add op</button>
